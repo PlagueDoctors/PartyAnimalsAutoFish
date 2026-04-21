@@ -29,7 +29,7 @@ def get_roi_manually(image_path):
     return roi
 
 
-roi = get_roi_manually("E:\\Steam\\userdata\\180269546\\760\\remote\\1260320\\screenshots\\20260419161809_1.jpg")
+roi = get_roi_manually("E:\\Steam\\userdata\\180269546\\760\\remote\\1260320\\screenshots\\20260421213049_2.jpg")
 
 
 
