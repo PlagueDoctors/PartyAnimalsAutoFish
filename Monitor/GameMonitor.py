@@ -14,12 +14,16 @@ import numpy as np
 import win32gui, win32ui, win32con
 from ctypes import windll
 import easyocr
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from main import FishAuto
 
 
 class GameMonitor:
 
     def __init__(self):
+        self.master: FishAuto = None
         self.image_list = [
             "D:\\Python\\PartyAnimals\\resource\\start.png",
             "D:\\Python\\PartyAnimals\\resource\\fish_done.png",
@@ -48,7 +52,7 @@ class GameMonitor:
     def window_monitor(self):
         print(f"正在监视窗口: 动物派对...")
 
-        while True:
+        while self.master.isrunning:
             try:
                 # 1. 获取画面
                 self.screen = self.get_window_screenshot()
@@ -60,19 +64,6 @@ class GameMonitor:
 
                 self.image_flag = found_statuses
                 self.found_rate = found_rate
-
-                #print(self.image_flag)
-                # 3. 创建/更新监视器窗口
-                # 可以使用 cv2.WINDOW_NORMAL 让窗口可以手动调整大小
-                # cv2.namedWindow('Monitor', cv2.WINDOW_NORMAL)
-                # cv2.imshow('Monitor', annotated_frame)
-                #
-                # # 4. 刷新频率 (1ms) 且检测退出键
-                # if cv2.waitKey(1) & 0xFF == ord('q'):
-                #     break
-                # if cv2.getWindowProperty("Monitor", cv2.WND_PROP_VISIBLE) < 1:
-                #     print("检测到监视窗口已关闭，正在退出程序...")
-                #     break
 
             except Exception as e:
                 print(f"错误: {e}")
