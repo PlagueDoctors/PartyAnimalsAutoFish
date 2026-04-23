@@ -29,6 +29,8 @@ class FishAuto:
         self.config_data = self.load()
         self.value_table = pd.read_excel("D:\\Python\\PartyAnimals\\resource\\fish_value.xlsx")
         self.value_table = self.value_table.set_index(["鱼类名称", "属性"])
+        self.bait_value = 4
+        self.total_value_nobait = 0
 
     def load(self):
         """读取配置文件"""
@@ -68,7 +70,7 @@ class FishAuto:
             start_flag = self.monitor.image_flag[0]
             got_fish_flag = self.monitor.image_flag[2]
             print(f"\r{self.monitor.image_flag} {self.monitor.found_rate}", end="")
-            if start_flag and not on_fishing:
+            if not on_fishing:
                 time.sleep(2)
                 pyautogui.mouseDown()
                 # 维持按下状态 0.5 秒
@@ -93,10 +95,12 @@ class FishAuto:
                             time_out = 550
                             fish_info = self.monitor.text_monitor()
                             fish_name, fish_quality = self.got_fish_info(fish_info)
-                            # fish_value = self.look_up_fish_value(fish_name, fish_quality)
+                            fish_value = self.look_up_fish_value(fish_name, fish_quality)
+                            total_value += (fish_value-self.bait_value)
+                            self.total_value_nobait += fish_value
+                            print(f"fish_done: {fish_name}, {fish_quality}, 价值: {fish_value}, 当前营收{total_value}, 总价{self.total_value_nobait}")
+                            self.config_data["total_value"] += (fish_value - self.bait_value)
                             self.update_fish_stats(fish_name, fish_quality)
-                            print(f"fish_done: {fish_name}, {fish_quality}, 价值: ")
-                            # self.config_data["total_value"] += fish_value
                             time.sleep(1)
                             on_fishing = False
                             pyautogui.mouseDown()
@@ -106,7 +110,7 @@ class FishAuto:
                         print("polling--")
                         pyautogui.mouseDown()
                         # 维持按下状态 0.5 秒
-                        time.sleep(0.7)
+                        time.sleep(0.85)
                         # 松开左键
                         pyautogui.mouseUp()
                         time.sleep(0.5)
@@ -128,12 +132,40 @@ class FishAuto:
         return fish_name, fish_quality
 
     def look_up_fish_value(self,fish_name, fish_quality):
-        if fish_name:
-            if not fish_quality:
-                fish_quality = "无品质"
-            value = self.value_table.loc[(fish_name, fish_quality), "价值"]
-            return value
-        return 0
+        self.value_table = self.value_table.sort_index()
+        # 1. 基础清理
+        if not fish_name:
+            return 1
+        # 统一品质名称，防止 OCR 识别出的品质带有杂质
+        fish_quality = fish_quality if fish_quality else "标准"
+
+        try:
+            # 2. 尝试精确匹配 (鱼名 + 品质)
+            return int(self.value_table.loc[(fish_name, fish_quality), "价值"])
+
+        except (KeyError, TypeError):
+            try:
+                # 3. 精确匹配失败，开始【限定品质】的模糊匹配
+                # 先从表格中提取出所有属于该品质的行
+                quality_group = self.value_table.xs(fish_quality, level="属性")
+
+                # 在该品质下，寻找鱼名最接近的项（包含关系）
+                # 比如 OCR 识别出 "大马哈鱼"，Excel 里是 "大马哈"
+                mask = quality_group.index.str.contains(fish_name) | \
+                       pd.Series(quality_group.index).apply(lambda x: x in fish_name).values
+
+                matched_rows = quality_group[mask]
+
+                if not matched_rows.empty:
+                    # 返回该品质下模糊匹配到的第一个价值
+                    return int(matched_rows["价值"].iloc[0])
+
+                # 4. 如果连模糊匹配也找不到，尝试该品质的平均价值
+                return int(quality_group["价值"].mean()) if not quality_group.empty else 1
+
+            except Exception as e:
+                print(f"匹配异常: {e}")
+                return 1  # 最终兜底
 
     def update_fish_stats(self, fish_name, fish_quality):
         """
